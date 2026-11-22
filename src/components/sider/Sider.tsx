@@ -24,17 +24,19 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const groups = useMemo(() => groupSessions(sessions, now, t), [sessions, now, t])
   const [deleting, setDeleting] = useState<SessionSummary | null>(null)
   const [deletePending, setDeletePending] = useState(false)
+  
+  // 搜索相关逻辑
   const [keyword, setKeyword] = useState('')
   const filteredGroups = keyword.trim()
-  ? groups
-      .map((group) => ({
-        ...group,
-        sessions: group.sessions.filter((s) =>
-          (s.title || '').toLowerCase().includes(keyword.toLowerCase())
-        ),
-      }))
-      .filter((group) => group.sessions.length > 0)
-  : groups;
+    ? groups
+        .map((group) => ({
+          ...group,
+          sessions: group.sessions.filter((s) =>
+            (s.title || '').toLowerCase().includes(keyword.toLowerCase())
+          ),
+        }))
+        .filter((group) => group.sessions.length > 0)
+    : groups
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
@@ -85,9 +87,8 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
         </span>
         {t('newChat')}
       </button>
+      
       <div className={styles.listWrap}>
-
-              <div className={styles.listWrap}>
         <div className={styles.list}>      
           {/* 新加的搜索框 */}
           <input
@@ -98,7 +99,6 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
             style={{ width: '100%', padding: '6px 8px', marginBottom: '8px' }}
           />
 
-          {/* 原来这里是 groups.map(...)，改成 filteredGroups.map(...) */}
           {filteredGroups.map((group) => (
             <div key={group.key} className={styles.section}>
               <div className={styles.sectionHeader}>{group.label}</div>
@@ -113,7 +113,7 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
             </div>
           ))}
         </div>
-      </div>        
+      </div>
 
       <div className={styles.bottom}>
         <button type="button" className={styles.settings} onClick={() => openSettings('general')}>
@@ -123,6 +123,7 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
           <span className={styles.settingsLabel}>{t('settings')}</span>
         </button>
       </div>
+      
       {deleting ? (
         <Modal
           title={t('deleteSessionModalContentTitle')}

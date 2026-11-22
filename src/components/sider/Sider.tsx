@@ -14,29 +14,35 @@ import { openSettings } from '../settings/settingsDialogState.js'
 import { closeMobileSider, useMobileSider } from './mobileSiderState.js'
 import { SessionItem } from './SessionItem.js'
 import styles from './Sider.module.css'
+// 👇 引入刚刚新建的搜索弹窗组件（请确保上一步已经创建了 SearchModal.tsx）
+import { SearchModal } from './SearchModal'
 
 /** 展开的侧边栏：名称与收起按钮、开启新对话、按时间分组的会话列表、底部设置；移动端放在抽屉里，收起按钮关闭抽屉 */
 export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const t = useTranslate()
   const sessions = useChatStore((state) => state.sessions)
   const activeId = useChatStore((state) => state.activeId)
+  
   const [now, setNow] = useState(Date.now)
   const groups = useMemo(() => groupSessions(sessions, now, t), [sessions, now, t])
+  
   const [deleting, setDeleting] = useState<SessionSummary | null>(null)
   const [deletePending, setDeletePending] = useState(false)
   
-  // 搜索相关逻辑
-  const [keyword, setKeyword] = useState('')
-  const filteredGroups = keyword.trim()
-    ? groups
-        .map((group) => ({
-          ...group,
-          sessions: group.sessions.filter((s) =>
-            (s.title || '').toLowerCase().includes(keyword.toLowerCase())
-          ),
-        }))
-        .filter((group) => group.sessions.length > 0)
-    : groups
+  // 控制全屏搜索弹窗的开关状态
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+
+  // 监听 Ctrl+K 或 Cmd+K 快捷键打开搜索
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setIsSearchOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [])
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
@@ -74,6 +80,7 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
           onClick={() => (mobile ? closeMobileSider() : setSiderCollapsed(true))}
         />
       </div>
+      
       <button
         type="button"
         className={styles.newChat}
@@ -87,19 +94,34 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
         </span>
         {t('newChat')}
       </button>
-      
+
+      {/* 👇 搜索框入口（点击打开弹窗） */}
+      <div
+        onClick={() => setIsSearchOpen(true)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 12px',
+          margin: '0 16px 12px 16px',
+          cursor: 'pointer',
+          borderRadius: '6px',
+          border: '1px solid rgba(0,0,0,0.1)',
+          color: '#888',
+          fontSize: '13px',
+          backgroundColor: 'rgba(0,0,0,0.02)',
+          transition: 'background-color 0.2s'
+        }}
+      >
+        <span>搜索历史对话...</span>
+        <span style={{ fontSize: '11px', background: 'rgba(0,0,0,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
+          ⌘K
+        </span>
+      </div>
+
       <div className={styles.listWrap}>
         <div className={styles.list}>      
-          {/* 新加的搜索框 */}
-          <input
-            type="text"
-            placeholder="搜索会话..."
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            style={{ width: '100%', padding: '6px 8px', marginBottom: '8px' }}
-          />
-
-          {filteredGroups.map((group) => (
+          {groups.map((group) => (
             <div key={group.key} className={styles.section}>
               <div className={styles.sectionHeader}>{group.label}</div>
               {group.sessions.map((session) => (
@@ -114,7 +136,7 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
           ))}
         </div>
       </div>
-
+      
       <div className={styles.bottom}>
         <button type="button" className={styles.settings} onClick={() => openSettings('general')}>
           <span className={styles.settingsIcon}>
@@ -123,7 +145,10 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
           <span className={styles.settingsLabel}>{t('settings')}</span>
         </button>
       </div>
-      
+
+      {/* 👇 挂载全屏搜索弹窗 */}
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+
       {deleting ? (
         <Modal
           title={t('deleteSessionModalContentTitle')}

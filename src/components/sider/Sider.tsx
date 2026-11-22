@@ -15,7 +15,7 @@ import { closeMobileSider, useMobileSider } from './mobileSiderState.js'
 import { SessionItem } from './SessionItem.js'
 import styles from './Sider.module.css'
 // 👇 引入刚刚新建的搜索弹窗组件（请确保上一步已经创建了 SearchModal.tsx）
-import { SearchModal } from './SearchModal'
+import { SearchModal } from './SearchModal.js'
 
 /** 展开的侧边栏：名称与收起按钮、开启新对话、按时间分组的会话列表、底部设置；移动端放在抽屉里，收起按钮关闭抽屉 */
 export const Sider = ({ mobile = false }: { mobile?: boolean }) => {

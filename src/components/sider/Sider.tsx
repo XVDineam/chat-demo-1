@@ -24,6 +24,17 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const groups = useMemo(() => groupSessions(sessions, now, t), [sessions, now, t])
   const [deleting, setDeleting] = useState<SessionSummary | null>(null)
   const [deletePending, setDeletePending] = useState(false)
+  const [keyword, setKeyword] = useState('')
+  const filteredGroups = keyword.trim()
+  ? groups
+      .map((group) => ({
+        ...group,
+        sessions: group.sessions.filter((s) =>
+          (s.title || '').toLowerCase().includes(keyword.toLowerCase())
+        ),
+      }))
+      .filter((group) => group.sessions.length > 0)
+  : groups;
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>

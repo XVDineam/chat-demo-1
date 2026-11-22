@@ -76,7 +76,8 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
       </button>
       <div className={styles.listWrap}>
         <div className={styles.list}>
-          /* 新加的搜索框 */
+          
+          {/** 新加的搜索框 **/}
   <input
     type="text"
     placeholder="搜索会话..."
@@ -85,7 +86,7 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
     style={{ width: '100%', padding: '6px 8px', marginBottom: '8px' }}
   />
 
-  /* 原来这里是 {groups.map(...)}，改成 {filteredGroups.map(...)} */
+          {/* 原来这里是 {groups.map(...)}，改成 {filteredGroups.map(...)} */}
   {filteredGroups.map((group) => (
             <div key={group.key} className={styles.section}>
               <div className={styles.sectionHeader}>{group.label}</div>

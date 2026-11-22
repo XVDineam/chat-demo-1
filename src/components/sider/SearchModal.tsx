@@ -1,27 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useChatStore } from '../../services/chat/store.js'
-import { useTranslate } from '../../i18n/index.js'
+// 👇 引入数据库查询方法（用于拉取完整消息）
+import { getSession } from '../../services/chat/db.js'
 
-// 1. 安全正则转义
 const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-// 2. 关键词高亮渲染
 const highlightText = (text: string, keyword: string) => {
   if (!keyword.trim() || !text) return text
   const regex = new RegExp(`(${escapeRegExp(keyword)})`, 'gi')
   const parts = text.split(regex)
   return parts.map((part, index) =>
     part.toLowerCase() === keyword.toLowerCase() ? (
-      <mark
-        key={index}
-        style={{
-          backgroundColor: '#ffe58f',
-          color: '#000',
-          padding: '0 2px',
-          borderRadius: '2px',
-          fontWeight: 'bold',
-        }}
-      >
+      <mark key={index} style={{ backgroundColor: '#ffe58f', color: '#000', padding: '0 2px', borderRadius: '2px', fontWeight: 'bold' }}>
         {part}
       </mark>
     ) : (
@@ -38,16 +28,47 @@ export const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () 
   const itemRefs = useRef<(HTMLDivElement | null)[]>([])
 
   const sessions = useChatStore((state) => state.sessions)
+  
+  // 💡 新增：保存包含完整消息的会话数据
+  const [fullSessionsData, setFullSessionsData] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
-  // 3. 全文与标题检索逻辑
+  // 💡 核心改动：当弹窗打开时，异步去数据库拉取所有聊天记录
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 60)
+      setKeyword('')
+      setActiveIndex(0)
+      
+      const loadAllSessions = async () => {
+        setIsLoading(true)
+        try {
+          // 利用 Promise.all 并发拉取所有会话的详细内容
+          const details = await Promise.all(
+            sessions.map((s: any) => getSession(s.id))
+          )
+          // 过滤掉可能已经被删除的空会话
+          setFullSessionsData(details.filter(Boolean))
+        } catch (error) {
+          console.error('加载搜索数据失败:', error)
+        } finally {
+          setIsLoading(false)
+        }
+      }
+      
+      loadAllSessions()
+    }
+  }, [isOpen, sessions])
+
+  // 💡 核心改动：在完整数据中检索标题和消息正文
   const results = useMemo(() => {
-    if (!keyword.trim()) return []
+    if (!keyword.trim() || isLoading) return []
 
     const lowerKeyword = keyword.toLowerCase()
     const matches: any[] = []
 
-    sessions.forEach((session: any) => {
-      // 检查标题
+    fullSessionsData.forEach((session: any) => {
+      // 1. 检查标题
       if (session.title && session.title.toLowerCase().includes(lowerKeyword)) {
         matches.push({
           type: 'title',
@@ -58,10 +79,11 @@ export const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () 
         })
       }
 
-      // 检查消息内容
+      // 2. 检查消息正文
       const messages = session.messages || []
       messages.forEach((msg: any) => {
-        if (msg.content && msg.content.toLowerCase().includes(lowerKeyword)) {
+        // 只搜索用户和 AI 的文本回复
+        if (msg.content && typeof msg.content === 'string' && msg.content.toLowerCase().includes(lowerKeyword)) {
           const idx = msg.content.toLowerCase().indexOf(lowerKeyword)
           const start = Math.max(0, idx - 25)
           const end = Math.min(msg.content.length, idx + lowerKeyword.length + 35)
@@ -82,32 +104,20 @@ export const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () 
     })
 
     return matches.slice(0, 50) // 限制最多展示 50 条防卡顿
-  }, [keyword, sessions])
-
-  // 4. 交互响应
-  useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 60)
-      setKeyword('')
-      setActiveIndex(0)
-    }
-  }, [isOpen])
+  }, [keyword, fullSessionsData, isLoading])
 
   useEffect(() => {
     setActiveIndex(0)
   }, [keyword])
 
-  // 键盘选中项自动滚入视野
   useEffect(() => {
     itemRefs.current[activeIndex]?.scrollIntoView({ block: 'nearest' })
   }, [activeIndex])
 
   if (!isOpen) return null
 
-  // 5. 点击执行跳转
   const handleSelect = (item: any) => {
     onClose()
-
     const state = useChatStore.getState()
     if (state.activeId !== item.sessionId) {
       state.setActiveId?.(item.sessionId)
@@ -138,30 +148,16 @@ export const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () 
   return (
     <div
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        zIndex: 9999,
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-        paddingTop: '10vh',
-        backdropFilter: 'blur(2px)',
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
+        paddingTop: '10vh', backdropFilter: 'blur(2px)',
       }}
       onClick={onClose}
     >
       <div
         style={{
-          width: 'min(90vw, 640px)',
-          backgroundColor: '#fff',
-          borderRadius: '12px',
-          boxShadow: '0 12px 32px rgba(0,0,0,0.2)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
+          width: 'min(90vw, 640px)', backgroundColor: '#fff', borderRadius: '12px',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.2)', overflow: 'hidden', display: 'flex', flexDirection: 'column',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -178,15 +174,9 @@ export const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () 
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             onKeyDown={handleKeyDown}
-            style={{
-              flex: 1,
-              border: 'none',
-              outline: 'none',
-              fontSize: '16px',
-              background: 'transparent',
-              color: '#333',
-            }}
+            style={{ flex: 1, border: 'none', outline: 'none', fontSize: '16px', background: 'transparent', color: '#333' }}
           />
+          {isLoading && <span style={{ fontSize: '12px', color: '#1677ff', marginRight: '8px' }}>正在加载记录...</span>}
           <div style={{ fontSize: '12px', color: '#999', background: '#f5f5f5', padding: '2px 6px', borderRadius: '4px' }}>ESC 关闭</div>
         </div>
 
@@ -195,6 +185,10 @@ export const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () 
           {!keyword.trim() ? (
             <div style={{ padding: '30px', textAlign: 'center', color: '#999', fontSize: '14px' }}>
               输入标题或聊天内容开始搜索...
+            </div>
+          ) : isLoading ? (
+            <div style={{ padding: '30px', textAlign: 'center', color: '#999', fontSize: '14px' }}>
+              正在读取历史记录，请稍候...
             </div>
           ) : results.length === 0 ? (
             <div style={{ padding: '30px', textAlign: 'center', color: '#999', fontSize: '14px' }}>
@@ -207,8 +201,7 @@ export const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                 ref={(el) => (itemRefs.current[index] = el)}
                 onClick={() => handleSelect(item)}
                 style={{
-                  padding: '10px 18px',
-                  cursor: 'pointer',
+                  padding: '10px 18px', cursor: 'pointer',
                   backgroundColor: index === activeIndex ? '#e6f7ff' : 'transparent',
                   transition: 'background-color 0.1s',
                 }}
